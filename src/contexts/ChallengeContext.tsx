@@ -3,6 +3,9 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
+type ParticipantStatus = 'waiting' | 'active' | 'lost' | 'won';
+type ChallengeStatus = 'waiting' | 'active' | 'completed';
+
 type ChallengeType = {
   id: string;
   createdBy: string;
@@ -12,10 +15,10 @@ type ChallengeType = {
     [key: string]: {
       name: string;
       reward: string;
-      status: 'waiting' | 'active' | 'lost' | 'won';
+      status: ParticipantStatus;
     }
   };
-  status: 'waiting' | 'active' | 'completed';
+  status: ChallengeStatus;
   startTime: number | null;
   endTime: number | null;
 };
@@ -154,18 +157,33 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const joinChallenge = (challengeId: string, name: string, reward: string) => {
-    if (challenge && challenge.id === challengeId) {
+    // First check if the challenge exists in localStorage
+    const existingChallengeJson = localStorage.getItem('challenge');
+    let existingChallenge: ChallengeType | null = null;
+    
+    if (existingChallengeJson) {
+      try {
+        const parsed = JSON.parse(existingChallengeJson);
+        if (parsed && parsed.id === challengeId) {
+          existingChallenge = parsed;
+        }
+      } catch (e) {
+        console.error("Error parsing stored challenge:", e);
+      }
+    }
+
+    if (existingChallenge && existingChallenge.id === challengeId) {
       // If this challenge already exists, add the participant
       const userId = generateId();
       
-      const updatedChallenge = {
-        ...challenge,
+      const updatedChallenge: ChallengeType = {
+        ...existingChallenge,
         participants: {
-          ...challenge.participants,
+          ...existingChallenge.participants,
           [userId]: {
             name,
             reward,
-            status: 'waiting'
+            status: 'waiting' as ParticipantStatus
           }
         }
       };
@@ -174,7 +192,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setParticipantId(userId);
       navigate(`/waiting/${challengeId}`);
     } else {
-      // If we don't have this challenge stored, create a new one
+      // We don't have the challenge stored, create a temporary one
       const userId = generateId();
       
       const newChallenge: ChallengeType = {
@@ -210,13 +228,13 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     Object.keys(updatedParticipants).forEach(id => {
       updatedParticipants[id] = {
         ...updatedParticipants[id],
-        status: 'active'
+        status: 'active' as ParticipantStatus
       };
     });
 
-    const updatedChallenge = {
+    const updatedChallenge: ChallengeType = {
       ...challenge,
-      status: 'active',
+      status: 'active' as ChallengeStatus,
       startTime: now,
       endTime,
       participants: updatedParticipants
@@ -239,17 +257,17 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       ...challenge.participants,
       [participantId]: {
         ...challenge.participants[participantId],
-        status: 'lost'
+        status: 'lost' as ParticipantStatus
       },
       [otherParticipantId]: {
         ...challenge.participants[otherParticipantId],
-        status: 'won'
+        status: 'won' as ParticipantStatus
       }
     };
     
-    const updatedChallenge = {
+    const updatedChallenge: ChallengeType = {
       ...challenge,
-      status: 'completed',
+      status: 'completed' as ChallengeStatus,
       participants: updatedParticipants
     };
     
@@ -267,14 +285,14 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (updatedParticipants[id].status === 'active') {
         updatedParticipants[id] = {
           ...updatedParticipants[id],
-          status: 'won'
+          status: 'won' as ParticipantStatus
         };
       }
     });
 
-    const updatedChallenge = {
+    const updatedChallenge: ChallengeType = {
       ...challenge,
-      status: 'completed',
+      status: 'completed' as ChallengeStatus,
       participants: updatedParticipants
     };
     

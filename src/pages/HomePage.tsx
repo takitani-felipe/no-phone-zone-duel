@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -7,6 +8,7 @@ import DuelCard from '@/components/DuelCard';
 import TimeSelector from '@/components/TimeSelector';
 import { useChallenge } from '@/contexts/ChallengeContext';
 import { PhoneOff, Link } from 'lucide-react';
+import { toast } from 'sonner';
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -18,12 +20,18 @@ const HomePage: React.FC = () => {
   const [isJoining, setIsJoining] = useState(false);
 
   const handleCreateChallenge = () => {
-    if (!name.trim()) return;
+    if (!name.trim()) {
+      toast.error("Please enter your name");
+      return;
+    }
     createChallenge(name, duration, reward);
   };
 
   const handleJoinChallenge = () => {
-    if (!challengeId.trim()) return;
+    if (!challengeId.trim()) {
+      toast.error("Please enter a challenge code");
+      return;
+    }
     navigate(`/join/${challengeId}`);
   };
 

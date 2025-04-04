@@ -60,7 +60,6 @@ const Countdown: React.FC<CountdownProps> = ({ className }) => {
       <Progress 
         value={progressValue} 
         className="h-2 bg-gray-200"
-        indicatorClassName="bg-duel-gradient"
       />
     </div>
   );
