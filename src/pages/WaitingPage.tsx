@@ -1,0 +1,100 @@
+
+import React, { useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import Layout from '@/components/Layout';
+import DuelCard from '@/components/DuelCard';
+import ParticipantCard from '@/components/ParticipantCard';
+import { useChallenge } from '@/contexts/ChallengeContext';
+import { Clock } from 'lucide-react';
+
+const WaitingPage: React.FC = () => {
+  const { challengeId } = useParams<{ challengeId: string }>();
+  const navigate = useNavigate();
+  const { challenge, participantId, startChallenge, resetChallenge } = useChallenge();
+  
+  useEffect(() => {
+    if (!challenge || challenge.id !== challengeId) {
+      navigate('/');
+    }
+  }, [challenge, challengeId, navigate]);
+
+  const handleStart = () => {
+    startChallenge();
+  };
+
+  const handleCancel = () => {
+    resetChallenge();
+  };
+
+  if (!challenge || !participantId) return null;
+
+  const participants = Object.entries(challenge.participants);
+  const canStart = participants.length >= 2;
+  const isCreator = participantId === challenge.createdBy;
+
+  return (
+    <Layout>
+      <div className="text-center mb-8">
+        <div className="inline-flex p-4 rounded-full bg-duel-light mb-4">
+          <Clock className="h-8 w-8 text-duel-purple" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Ready to Start</h2>
+        <p className="text-gray-600">
+          {canStart 
+            ? "Everyone's here! Ready to start the duel?" 
+            : "Waiting for your friend to join..."}
+        </p>
+      </div>
+
+      <DuelCard className="mb-6">
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-lg font-medium mb-4">Participants</h3>
+            <div className="space-y-3">
+              {participants.map(([id, participant]) => (
+                <ParticipantCard
+                  key={id}
+                  name={participant.name}
+                  reward={participant.reward}
+                  status={participant.status}
+                  isCurrentUser={id === participantId}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {isCreator && (
+              <Button 
+                className="w-full bg-duel-gradient hover:opacity-90 transition-opacity"
+                onClick={handleStart}
+                disabled={!canStart}
+              >
+                Start Challenge
+              </Button>
+            )}
+            
+            <Button 
+              variant="outline"
+              className="w-full"
+              onClick={handleCancel}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </DuelCard>
+
+      {!canStart && (
+        <div className="text-center animate-pulse-grow">
+          <p className="text-sm text-duel-purple">
+            Waiting for more participants...
+          </p>
+        </div>
+      )}
+    </Layout>
+  );
+};
+
+export default WaitingPage;
