@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy, Share2 } from 'lucide-react';
 import Layout from '@/components/Layout';
 import DuelCard from '@/components/DuelCard';
 import { useChallenge } from '@/contexts/ChallengeContext';
@@ -30,6 +30,26 @@ const InvitePage: React.FC = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleShareLink = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Join my Focus Fight challenge!',
+          text: 'Let\'s see who can stay off their phone longer!',
+          url: shareableLink,
+        });
+        toast.success('Link shared successfully!');
+      } catch (error) {
+        // User canceled or share failed
+        console.log('Error sharing:', error);
+      }
+    } else {
+      // Fallback for browsers that don't support the Web Share API
+      handleCopyLink();
+      toast.info('Share not supported on this browser. Link copied instead!');
+    }
+  };
+
   const handleCopyCode = () => {
     navigator.clipboard.writeText(challengeId || '');
     toast.success('Challenge code copied to clipboard!');
@@ -43,8 +63,7 @@ const InvitePage: React.FC = () => {
 
   return (
     <Layout>
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Invite a Friend</h2>
+      <div className="text-center mb-4">
         <p className="text-gray-600">Share this link with your friend to start the duel</p>
       </div>
 
@@ -58,18 +77,28 @@ const InvitePage: React.FC = () => {
               <Input
                 value={shareableLink}
                 readOnly
-                className="pr-10"
+                className="pr-20"
               />
-              <button
-                className="absolute right-2 top-1/2 transform -translate-y-1/2"
-                onClick={handleCopyLink}
-              >
-                {copied ? (
-                  <Check className="h-4 w-4 text-green-500" />
-                ) : (
-                  <Copy className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-                )}
-              </button>
+              <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex space-x-1">
+                <button
+                  className="p-1 hover:bg-gray-100 rounded-full"
+                  onClick={handleCopyLink}
+                  title="Copy link"
+                >
+                  {copied ? (
+                    <Check className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <Copy className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                  )}
+                </button>
+                <button
+                  className="p-1 hover:bg-gray-100 rounded-full"
+                  onClick={handleShareLink}
+                  title="Share link"
+                >
+                  <Share2 className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                </button>
+              </div>
             </div>
           </div>
 
