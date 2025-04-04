@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,7 @@ import Layout from '@/components/Layout';
 import DuelCard from '@/components/DuelCard';
 import TimeSelector from '@/components/TimeSelector';
 import { useChallenge } from '@/contexts/ChallengeContext';
-import { PhoneOff, Link } from 'lucide-react';
+import { PhoneOff, Link, Swords } from 'lucide-react';
 import { toast } from 'sonner';
 
 const HomePage: React.FC = () => {
@@ -38,7 +39,10 @@ const HomePage: React.FC = () => {
     <Layout>
       <div className="text-center mb-8">
         <div className="inline-flex p-4 rounded-full bg-duel-light mb-4">
-          <PhoneOff className="h-8 w-8 text-duel-purple" />
+          <div className="relative">
+            <PhoneOff className="h-8 w-8 text-duel-purple absolute -left-1 bottom-0 transform -rotate-12" />
+            <Swords className="h-8 w-8 text-duel-blue absolute -right-1 bottom-0 transform rotate-12" />
+          </div>
         </div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Focus Fight</h2>
         <p className="text-gray-600">Challenge a friend to stay off your phones and win rewards.</p>
