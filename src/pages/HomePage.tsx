@@ -20,13 +20,28 @@ const HomePage: React.FC = () => {
   const [reward, setReward] = useState('');
   const [challengeId, setChallengeId] = useState('');
   const [isJoining, setIsJoining] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleCreateChallenge = () => {
+  const handleCreateChallenge = async () => {
     if (!name.trim()) {
       toast.error("Please enter your name");
       return;
     }
-    createChallenge(name, duration, reward);
+    
+    setIsLoading(true);
+    try {
+      const id = await createChallenge(name, duration, reward);
+      if (id) {
+        navigate(`/invite/${id}`);
+      } else {
+        toast.error("Failed to create challenge. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error creating challenge:", error);
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleJoinChallenge = () => {
@@ -65,8 +80,12 @@ const HomePage: React.FC = () => {
                   <Input id="reward" placeholder="e.g. $5, coffee, lunch..." value={reward} onChange={e => setReward(e.target.value)} />
                 </div>
 
-                <Button className="w-full bg-duel-gradient hover:opacity-90 transition-opacity" onClick={handleCreateChallenge} disabled={!name.trim()}>
-                  Create Challenge
+                <Button 
+                  className="w-full bg-duel-gradient hover:opacity-90 transition-opacity" 
+                  onClick={handleCreateChallenge} 
+                  disabled={!name.trim() || isLoading}
+                >
+                  {isLoading ? "Creating..." : "Create Challenge"}
                 </Button>
               </div>
             </> : <>
