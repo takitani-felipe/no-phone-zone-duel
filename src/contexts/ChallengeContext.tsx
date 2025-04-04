@@ -2,21 +2,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { createClient } from '@supabase/supabase-js';
-
-// Initialize Supabase client
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-// Check if Supabase credentials are available
-if (!supabaseUrl || !supabaseKey) {
-  console.error("Missing Supabase credentials. Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set.");
-}
-
-// Initialize Supabase client with null check
-const supabase = supabaseUrl && supabaseKey 
-  ? createClient(supabaseUrl, supabaseKey)
-  : null;
+import { supabase } from "@/integrations/supabase/client";
 
 type ParticipantStatus = 'waiting' | 'active' | 'lost' | 'won';
 type ChallengeStatus = 'waiting' | 'active' | 'completed';
@@ -42,9 +28,9 @@ type ChallengeContextType = {
   challenge: ChallengeType | null;
   participantId: string | null;
   createChallenge: (name: string, duration: number, reward: string) => Promise<string>;
-  joinChallenge: (challengeId: string, name: string, reward: string) => void;
-  startChallenge: () => void;
-  handleLoss: () => void;
+  joinChallenge: (challengeId: string, name: string, reward: string) => Promise<void>;
+  startChallenge: () => Promise<void>;
+  handleLoss: () => Promise<void>;
   resetChallenge: () => void;
 };
 
@@ -52,9 +38,9 @@ const defaultContext: ChallengeContextType = {
   challenge: null,
   participantId: null,
   createChallenge: async () => '',
-  joinChallenge: () => {},
-  startChallenge: () => {},
-  handleLoss: () => {},
+  joinChallenge: async () => {},
+  startChallenge: async () => {},
+  handleLoss: async () => {},
   resetChallenge: () => {},
 };
 
@@ -62,14 +48,8 @@ const ChallengeContext = createContext<ChallengeContextType>(defaultContext);
 
 export const useChallenge = () => useContext(ChallengeContext);
 
-// Helper functions for managing storage and syncing with Supabase
+// Helper functions for managing challenges with Supabase
 const getChallenge = async (challengeId: string): Promise<ChallengeType | null> => {
-  if (!supabase) {
-    console.error("Supabase client not initialized. Using local storage fallback.");
-    const challengeJson = localStorage.getItem('challenge');
-    return challengeJson ? JSON.parse(challengeJson) : null;
-  }
-
   try {
     const { data, error } = await supabase
       .from('challenges')
@@ -81,7 +61,21 @@ const getChallenge = async (challengeId: string): Promise<ChallengeType | null> 
       throw error;
     }
     
-    return data as ChallengeType;
+    if (!data) return null;
+    
+    // Transform the database record into our app's challenge format
+    const challenge: ChallengeType = {
+      id: data.id,
+      createdBy: data.created_by,
+      duration: data.duration,
+      reward: data.reward || '',
+      participants: data.participants as ChallengeType['participants'],
+      status: data.status as ChallengeStatus,
+      startTime: data.start_time || null,
+      endTime: data.end_time || null
+    };
+    
+    return challenge;
   } catch (error) {
     console.error(`Error fetching challenge ${challengeId}:`, error);
     
@@ -100,18 +94,25 @@ const getChallenge = async (challengeId: string): Promise<ChallengeType | null> 
 const updateChallenge = async (challenge: ChallengeType): Promise<void> => {
   if (!challenge || !challenge.id) return;
   
-  // Update local cache
+  // Update local cache for faster UI updates
   localStorage.setItem('challenge', JSON.stringify(challenge));
   
-  if (!supabase) {
-    console.error("Supabase client not initialized. Changes will only be saved locally.");
-    return;
-  }
-  
   try {
+    // Transform our app's challenge format into the database record format
+    const dbChallenge = {
+      id: challenge.id,
+      created_by: challenge.createdBy,
+      duration: challenge.duration,
+      reward: challenge.reward,
+      participants: challenge.participants,
+      status: challenge.status,
+      start_time: challenge.startTime,
+      end_time: challenge.endTime
+    };
+    
     const { error } = await supabase
       .from('challenges')
-      .upsert(challenge, { onConflict: 'id' });
+      .upsert(dbChallenge, { onConflict: 'id' });
     
     if (error) {
       throw error;
@@ -127,7 +128,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [participantId, setParticipantId] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // Load challenge from localStorage
+  // Load challenge from localStorage (for initial load or fallback)
   useEffect(() => {
     const storedChallenge = localStorage.getItem('challenge');
     const storedParticipantId = localStorage.getItem('participantId');
@@ -145,8 +146,6 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     if (challenge) {
       localStorage.setItem('challenge', JSON.stringify(challenge));
-      // Update the challenge in Supabase
-      updateChallenge(challenge);
     }
     
     if (participantId) {
@@ -156,36 +155,45 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Set up real-time subscription to the challenge
   useEffect(() => {
-    if (!challenge || !challenge.id || !supabase) return;
+    if (!challenge || !challenge.id) return;
 
-    // Set up real-time subscription
+    // Set up real-time subscription using Supabase Realtime
     const subscription = supabase
       .channel(`challenge-${challenge.id}`)
-      .on('postgres_changes', { 
-        event: 'UPDATE',
-        schema: 'public', 
-        table: 'challenges',
-        filter: `id=eq.${challenge.id}`
-      }, (payload) => {
-        const updatedChallenge = payload.new as ChallengeType;
-        
-        if (JSON.stringify(updatedChallenge) !== JSON.stringify(challenge)) {
-          // Preserve the current participant's information during sync
-          if (participantId && updatedChallenge.participants) {
-            if (!updatedChallenge.participants[participantId] && challenge.participants[participantId]) {
-              updatedChallenge.participants[participantId] = challenge.participants[participantId];
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'challenges',
+          filter: `id=eq.${challenge.id}`
+        },
+        async (payload) => {
+          console.log('Realtime update received:', payload);
+          
+          // Get the updated challenge from Supabase
+          const updatedChallenge = await getChallenge(challenge.id);
+          
+          if (updatedChallenge && JSON.stringify(updatedChallenge) !== JSON.stringify(challenge)) {
+            console.log('Setting updated challenge:', updatedChallenge);
+            
+            // Preserve the current participant's information
+            if (participantId && updatedChallenge.participants) {
+              if (!updatedChallenge.participants[participantId] && challenge.participants[participantId]) {
+                updatedChallenge.participants[participantId] = challenge.participants[participantId];
+              }
+            }
+            
+            setChallenge(updatedChallenge);
+            
+            // If challenge status changed to active, navigate to duel page
+            if (updatedChallenge.status === 'active' && challenge.status === 'waiting') {
+              navigate(`/duel/${challenge.id}`);
+              toast.success("Challenge started!");
             }
           }
-          
-          setChallenge(updatedChallenge);
-          
-          // If challenge status changed to active, navigate to duel page
-          if (updatedChallenge.status === 'active' && challenge.status === 'waiting') {
-            navigate(`/duel/${challenge.id}`);
-            toast.success("Challenge started!");
-          }
         }
-      })
+      )
       .subscribe();
 
     // Fallback polling mechanism in case the subscription fails
@@ -274,11 +282,12 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const generateId = () => Math.random().toString(36).substring(2, 9);
 
   const createChallenge = async (name: string, duration: number, reward: string): Promise<string> => {
-    const challengeId = generateId();
+    // Generate unique IDs
     const userId = generateId();
     
+    // Create challenge object for our app format
     const newChallenge: ChallengeType = {
-      id: challengeId,
+      id: '', // Will be assigned by Supabase
       createdBy: userId,
       duration,
       reward: '',
@@ -294,18 +303,57 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       endTime: null
     };
     
-    setChallenge(newChallenge);
-    setParticipantId(userId);
-    await updateChallenge(newChallenge); // Store in Supabase
-    
-    return challengeId;
+    try {
+      // Format for database
+      const dbChallenge = {
+        created_by: newChallenge.createdBy,
+        duration: newChallenge.duration,
+        reward: newChallenge.reward,
+        participants: newChallenge.participants,
+        status: newChallenge.status,
+        start_time: newChallenge.startTime,
+        end_time: newChallenge.endTime
+      };
+      
+      // Insert into Supabase
+      const { data, error } = await supabase
+        .from('challenges')
+        .insert(dbChallenge)
+        .select()
+        .single();
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Update our challenge with the ID from Supabase
+      const createdChallenge: ChallengeType = {
+        ...newChallenge,
+        id: data.id
+      };
+      
+      setChallenge(createdChallenge);
+      setParticipantId(userId);
+      localStorage.setItem('participantId', userId);
+      
+      return data.id;
+    } catch (error) {
+      console.error('Error creating challenge:', error);
+      toast.error("Failed to create challenge. Please try again.");
+      return '';
+    }
   };
 
   const joinChallenge = async (challengeId: string, name: string, reward: string) => {
-    // Get challenge from Supabase
-    const existingChallenge = await getChallenge(challengeId);
-    
-    if (existingChallenge) {
+    try {
+      // Get challenge from Supabase
+      const existingChallenge = await getChallenge(challengeId);
+      
+      if (!existingChallenge) {
+        toast.error("Challenge not found. Check the code and try again.");
+        return;
+      }
+      
       // Add the participant
       const userId = generateId();
       const updatedChallenge: ChallengeType = {
@@ -322,34 +370,14 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       
       setChallenge(updatedChallenge);
       setParticipantId(userId);
-      await updateChallenge(updatedChallenge); // Update in Supabase
-      navigate(`/waiting/${challengeId}`);
-    } else {
-      toast.error("Challenge not found. Check the code and try again.");
-      // We don't have the challenge stored, create a temporary one
-      const userId = generateId();
+      localStorage.setItem('participantId', userId);
       
-      const newChallenge: ChallengeType = {
-        id: challengeId,
-        createdBy: userId, // Temp creator until the real one connects
-        duration: 60, // Default duration of 60 minutes
-        reward: '',
-        participants: {
-          [userId]: {
-            name,
-            reward,
-            status: 'waiting'
-          }
-        },
-        status: 'waiting',
-        startTime: null,
-        endTime: null
-      };
-      
-      setChallenge(newChallenge);
-      setParticipantId(userId);
-      await updateChallenge(newChallenge); // Store in Supabase
+      // Update the challenge in Supabase
+      await updateChallenge(updatedChallenge);
       navigate(`/waiting/${challengeId}`);
+    } catch (error) {
+      console.error('Error joining challenge:', error);
+      toast.error("Failed to join challenge. Please try again.");
     }
   };
 
@@ -376,7 +404,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
     
     setChallenge(updatedChallenge);
-    await updateChallenge(updatedChallenge); // Update in Supabase
+    await updateChallenge(updatedChallenge);
     navigate(`/duel/${challenge.id}`);
   };
 
@@ -419,7 +447,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
     
     setChallenge(updatedChallenge);
-    await updateChallenge(updatedChallenge); // Update in Supabase
+    await updateChallenge(updatedChallenge);
     
     if (updatedStatus === 'completed') {
       navigate(`/results/${challenge.id}`);
@@ -449,7 +477,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
     
     setChallenge(updatedChallenge);
-    await updateChallenge(updatedChallenge); // Update in Supabase
+    await updateChallenge(updatedChallenge);
     navigate(`/results/${challenge.id}`);
     toast.success("Challenge completed successfully!");
   };
