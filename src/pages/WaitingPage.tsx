@@ -35,11 +35,10 @@ const WaitingPage: React.FC = () => {
 
   return (
     <Layout>
-      <div className="text-center mb-8">
-        <div className="inline-flex p-4 rounded-full bg-duel-light mb-4">
+      <div className="text-center mb-4">
+        <div className="inline-flex p-4 rounded-full bg-duel-light mb-2">
           <Clock className="h-8 w-8 text-duel-purple" />
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Ready to Start</h2>
         <p className="text-gray-600">
           {canStart 
             ? "Everyone's here! Ready to start the duel?" 

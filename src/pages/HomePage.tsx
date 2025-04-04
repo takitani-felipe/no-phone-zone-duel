@@ -37,11 +37,10 @@ const HomePage: React.FC = () => {
 
   return (
     <Layout>
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center p-4 rounded-full bg-duel-light mb-4 relative w-16 h-16">
+      <div className="text-center mb-4">
+        <div className="inline-flex items-center justify-center p-4 rounded-full bg-duel-light mb-2 relative w-16 h-16">
           <PhoneOff className="h-10 w-10 text-duel-purple" />
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Focus Fight</h2>
         <p className="text-gray-600">Challenge a friend to stay off your phones and win rewards.</p>
       </div>
 
