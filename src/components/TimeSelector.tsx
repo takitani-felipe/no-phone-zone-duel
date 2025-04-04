@@ -30,11 +30,11 @@ const TimeSelector: React.FC<TimeSelectorProps> = ({ value, onChange }) => {
         className="py-4"
       />
       
-      <div className="flex justify-between text-xs text-gray-500">
-        <span className="ml-0">5m</span>
-        <span className="ml-[calc(21.7%-5px)]">30m</span>
-        <span className="ml-[calc(18.3%-5px)]">60m</span>
-        <span className="mr-0">120m</span>
+      <div className="grid grid-cols-4 text-xs text-gray-500">
+        <span className="text-left">5m</span>
+        <span className="text-center">30m</span>
+        <span className="text-center">60m</span>
+        <span className="text-right">120m</span>
       </div>
     </div>
   );
