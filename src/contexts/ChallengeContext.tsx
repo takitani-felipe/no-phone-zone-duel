@@ -291,33 +291,48 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const handleLoss = () => {
     if (!challenge || !participantId) return;
     
-    // Find the other participant
-    const otherParticipantId = Object.keys(challenge.participants).find(id => id !== participantId);
-    
-    if (!otherParticipantId) return;
-    
-    // Update status for both participants
+    // Update this participant's status to lost
     const updatedParticipants = {
       ...challenge.participants,
       [participantId]: {
         ...challenge.participants[participantId],
         status: 'lost' as ParticipantStatus
-      },
-      [otherParticipantId]: {
-        ...challenge.participants[otherParticipantId],
-        status: 'won' as ParticipantStatus
       }
     };
     
+    // Check if there's only one active participant left
+    const activeParticipants = Object.entries(updatedParticipants)
+      .filter(([_, p]) => p.status === 'active');
+    
+    let updatedStatus = challenge.status;
+    
+    // If only one active player remains, they win
+    if (activeParticipants.length === 1) {
+      const lastActiveId = activeParticipants[0][0];
+      updatedParticipants[lastActiveId] = {
+        ...updatedParticipants[lastActiveId],
+        status: 'won' as ParticipantStatus
+      };
+      updatedStatus = 'completed' as ChallengeStatus;
+    }
+    // If no active players remain, challenge is completed
+    else if (activeParticipants.length === 0) {
+      updatedStatus = 'completed' as ChallengeStatus;
+    }
+    
     const updatedChallenge: ChallengeType = {
       ...challenge,
-      status: 'completed' as ChallengeStatus,
+      status: updatedStatus,
       participants: updatedParticipants
     };
     
     setChallenge(updatedChallenge);
     updateChallenge(updatedChallenge); // Update the shared store
-    navigate(`/results/${challenge.id}`);
+    
+    if (updatedStatus === 'completed') {
+      navigate(`/results/${challenge.id}`);
+    }
+    
     toast.error("You looked at your phone! You lost the challenge.");
   };
 

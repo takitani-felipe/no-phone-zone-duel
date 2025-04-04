@@ -51,7 +51,9 @@ const ResultsPage: React.FC = () => {
             ? (wonRewards.length > 0 
               ? `You've earned: ${wonRewards.join(', ')}` 
               : 'You stayed off your phone!')
-            : 'You checked your phone and lost the challenge.'}
+            : winners.length === 0 
+              ? 'Everyone checked their phones! Challenge failed.'
+              : `${winners.map(([_, p]) => p.name).join(', ')} won the challenge.`}
         </p>
       </div>
 
@@ -59,17 +61,39 @@ const ResultsPage: React.FC = () => {
         <div className="space-y-6">
           <div>
             <h3 className="text-lg font-medium mb-4">Final Results</h3>
-            <div className="space-y-3">
-              {participants.map(([id, participant]) => (
-                <ParticipantCard
-                  key={id}
-                  name={participant.name}
-                  reward={participant.reward}
-                  status={participant.status}
-                  isCurrentUser={id === participantId}
-                />
-              ))}
-            </div>
+            {winners.length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-sm font-medium text-green-600 mb-2">Winners</h4>
+                <div className="space-y-3">
+                  {winners.map(([id, participant]) => (
+                    <ParticipantCard
+                      key={id}
+                      name={participant.name}
+                      reward={participant.reward}
+                      status={participant.status}
+                      isCurrentUser={id === participantId}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {losers.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium text-red-600 mb-2">Eliminated</h4>
+                <div className="space-y-3">
+                  {losers.map(([id, participant]) => (
+                    <ParticipantCard
+                      key={id}
+                      name={participant.name}
+                      reward={participant.reward}
+                      status={participant.status}
+                      isCurrentUser={id === participantId}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <Button 
