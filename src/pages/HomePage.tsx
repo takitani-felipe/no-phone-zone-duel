@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -120,15 +119,15 @@ const HomePage: React.FC = () => {
       <div className="text-center">
         <Button
           variant="ghost"
-          className="text-gray-500 hover:text-gray-700 text-sm"
+          className="text-gray-600 hover:text-duel-purple text-sm hover:bg-duel-light transition-colors"
           onClick={() => setIsJoining(!isJoining)}
         >
           {isJoining ? (
             <>Want to create a challenge?</>
           ) : (
-            <div className="flex items-center gap-1">
-              <Link className="h-4 w-4" />
-              <span>Join an existing challenge</span>
+            <div className="flex items-center gap-1.5 font-medium">
+              <Link className="h-5 w-5 text-duel-purple" />
+              <span className="bg-duel-gradient bg-clip-text text-transparent">Join an existing challenge</span>
             </div>
           )}
         </Button>
