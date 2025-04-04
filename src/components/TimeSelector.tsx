@@ -24,14 +24,14 @@ const TimeSelector: React.FC<TimeSelectorProps> = ({ value, onChange }) => {
       <Slider
         defaultValue={[value]}
         max={120}
-        min={1}
-        step={1}
+        min={5}
+        step={5}
         onValueChange={handleChange}
         className="py-4"
       />
       
       <div className="flex justify-between text-xs text-gray-500">
-        <span>1m</span>
+        <span>5m</span>
         <span>30m</span>
         <span>60m</span>
         <span>120m</span>
