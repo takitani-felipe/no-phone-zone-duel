@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,15 +13,37 @@ const JoinPage: React.FC = () => {
   const navigate = useNavigate();
   const { joinChallenge } = useChallenge();
   const [name, setName] = useState('');
-  const [reward, setReward] = useState('');
+  const [ownerReward, setOwnerReward] = useState('');
+
+  useEffect(() => {
+    // Get the challenge information from localStorage to show the owner's reward
+    if (challengeId) {
+      const allChallenges = getAllChallenges();
+      const challenge = allChallenges[challengeId];
+      
+      if (challenge) {
+        // Find the creator's participant entry
+        const creatorId = challenge.createdBy;
+        if (creatorId && challenge.participants[creatorId]) {
+          setOwnerReward(challenge.participants[creatorId].reward || 'Nothing specified');
+        }
+      }
+    }
+  }, [challengeId]);
 
   const handleJoinChallenge = () => {
     if (!name.trim() || !challengeId) return;
-    joinChallenge(challengeId, name, reward);
+    joinChallenge(challengeId, name, ownerReward);
   };
 
   const handleCancel = () => {
     navigate('/');
+  };
+
+  // Helper function to get all challenges from localStorage
+  const getAllChallenges = (): Record<string, any> => {
+    const challengesJson = localStorage.getItem('all_challenges');
+    return challengesJson ? JSON.parse(challengesJson) : {};
   };
 
   return (
@@ -31,7 +53,7 @@ const JoinPage: React.FC = () => {
           <UserIcon className="h-8 w-8 text-duel-purple" />
         </div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Join Challenge</h2>
-        <p className="text-gray-600">Enter your details to join the duel</p>
+        <p className="text-gray-600">Enter your name to join the duel</p>
       </div>
 
       <DuelCard>
@@ -48,17 +70,15 @@ const JoinPage: React.FC = () => {
             />
           </div>
           
-          <div>
-            <label htmlFor="reward" className="block text-sm font-medium text-gray-700 mb-1">
-              What are you betting? (optional)
-            </label>
-            <Input
-              id="reward"
-              placeholder="e.g. $5, coffee, lunch..."
-              value={reward}
-              onChange={(e) => setReward(e.target.value)}
-            />
-          </div>
+          {ownerReward && (
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                What's at stake
+              </label>
+              <p className="text-gray-800">{ownerReward}</p>
+              <p className="text-xs text-gray-500 mt-1">Set by the challenge creator</p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Button 
