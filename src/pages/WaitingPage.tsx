@@ -7,6 +7,7 @@ import DuelCard from '@/components/DuelCard';
 import ParticipantCard from '@/components/ParticipantCard';
 import { useChallenge } from '@/contexts/ChallengeContext';
 import { Clock } from 'lucide-react';
+import { toast } from 'sonner';
 
 const WaitingPage: React.FC = () => {
   const { challengeId } = useParams<{ challengeId: string }>();
@@ -20,11 +21,15 @@ const WaitingPage: React.FC = () => {
   }, [challenge, challengeId, navigate]);
 
   const handleStart = () => {
-    startChallenge();
+    if (startChallenge) {
+      startChallenge();
+      toast.success("Challenge started!");
+    }
   };
 
   const handleCancel = () => {
     resetChallenge();
+    toast.info("Challenge cancelled");
   };
 
   if (!challenge || !participantId) return null;
