@@ -5,9 +5,18 @@ import { toast } from 'sonner';
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize Supabase client
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+// Check if Supabase credentials are available
+if (!supabaseUrl || !supabaseKey) {
+  console.error("Missing Supabase credentials. Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set.");
+}
+
+// Initialize Supabase client with null check
+const supabase = supabaseUrl && supabaseKey 
+  ? createClient(supabaseUrl, supabaseKey)
+  : null;
 
 type ParticipantStatus = 'waiting' | 'active' | 'lost' | 'won';
 type ChallengeStatus = 'waiting' | 'active' | 'completed';
@@ -32,7 +41,7 @@ type ChallengeType = {
 type ChallengeContextType = {
   challenge: ChallengeType | null;
   participantId: string | null;
-  createChallenge: (name: string, duration: number, reward: string) => string;
+  createChallenge: (name: string, duration: number, reward: string) => Promise<string>;
   joinChallenge: (challengeId: string, name: string, reward: string) => void;
   startChallenge: () => void;
   handleLoss: () => void;
@@ -42,7 +51,7 @@ type ChallengeContextType = {
 const defaultContext: ChallengeContextType = {
   challenge: null,
   participantId: null,
-  createChallenge: () => '',
+  createChallenge: async () => '',
   joinChallenge: () => {},
   startChallenge: () => {},
   handleLoss: () => {},
@@ -55,6 +64,12 @@ export const useChallenge = () => useContext(ChallengeContext);
 
 // Helper functions for managing storage and syncing with Supabase
 const getChallenge = async (challengeId: string): Promise<ChallengeType | null> => {
+  if (!supabase) {
+    console.error("Supabase client not initialized. Using local storage fallback.");
+    const challengeJson = localStorage.getItem('challenge');
+    return challengeJson ? JSON.parse(challengeJson) : null;
+  }
+
   try {
     const { data, error } = await supabase
       .from('challenges')
@@ -85,6 +100,14 @@ const getChallenge = async (challengeId: string): Promise<ChallengeType | null> 
 const updateChallenge = async (challenge: ChallengeType): Promise<void> => {
   if (!challenge || !challenge.id) return;
   
+  // Update local cache
+  localStorage.setItem('challenge', JSON.stringify(challenge));
+  
+  if (!supabase) {
+    console.error("Supabase client not initialized. Changes will only be saved locally.");
+    return;
+  }
+  
   try {
     const { error } = await supabase
       .from('challenges')
@@ -93,15 +116,9 @@ const updateChallenge = async (challenge: ChallengeType): Promise<void> => {
     if (error) {
       throw error;
     }
-    
-    // Also update local cache
-    localStorage.setItem('challenge', JSON.stringify(challenge));
   } catch (error) {
     console.error('Error updating challenge:', error);
     toast.error("Failed to sync with database. Challenge may not update for others.");
-    
-    // Still update local cache as fallback
-    localStorage.setItem('challenge', JSON.stringify(challenge));
   }
 };
 
@@ -139,7 +156,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Set up real-time subscription to the challenge
   useEffect(() => {
-    if (!challenge || !challenge.id) return;
+    if (!challenge || !challenge.id || !supabase) return;
 
     // Set up real-time subscription
     const subscription = supabase
@@ -256,7 +273,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const generateId = () => Math.random().toString(36).substring(2, 9);
 
-  const createChallenge = (name: string, duration: number, reward: string) => {
+  const createChallenge = async (name: string, duration: number, reward: string): Promise<string> => {
     const challengeId = generateId();
     const userId = generateId();
     
@@ -279,8 +296,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     
     setChallenge(newChallenge);
     setParticipantId(userId);
-    updateChallenge(newChallenge); // Store in Supabase
-    navigate(`/invite/${challengeId}`);
+    await updateChallenge(newChallenge); // Store in Supabase
     
     return challengeId;
   };
