@@ -6,7 +6,7 @@ import Layout from '@/components/Layout';
 import DuelCard from '@/components/DuelCard';
 import ParticipantCard from '@/components/ParticipantCard';
 import { useChallenge } from '@/contexts/ChallengeContext';
-import { Clock } from 'lucide-react';
+import { Clock, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 const WaitingPage: React.FC = () => {
@@ -54,7 +54,15 @@ const WaitingPage: React.FC = () => {
       <DuelCard className="mb-6">
         <div className="space-y-6">
           <div>
-            <h3 className="text-lg font-medium mb-4">Participants</h3>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Participants</h3>
+              {!canStart && (
+                <div className="text-xs text-gray-500 flex items-center animate-pulse">
+                  <RefreshCw className="h-3 w-3 mr-1" /> 
+                  Refreshing...
+                </div>
+              )}
+            </div>
             <div className="space-y-3">
               {participants.map(([id, participant]) => (
                 <ParticipantCard

@@ -47,6 +47,21 @@ const ChallengeContext = createContext<ChallengeContextType>(defaultContext);
 
 export const useChallenge = () => useContext(ChallengeContext);
 
+// Define key for storing challenges in localStorage
+const CHALLENGE_STORE_KEY = 'all_challenges';
+
+// Helper functions for managing localStorage
+const getAllChallenges = (): Record<string, ChallengeType> => {
+  const challengesJson = localStorage.getItem(CHALLENGE_STORE_KEY);
+  return challengesJson ? JSON.parse(challengesJson) : {};
+};
+
+const updateChallenge = (challenge: ChallengeType) => {
+  const allChallenges = getAllChallenges();
+  allChallenges[challenge.id] = challenge;
+  localStorage.setItem(CHALLENGE_STORE_KEY, JSON.stringify(allChallenges));
+};
+
 export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [challenge, setChallenge] = useState<ChallengeType | null>(null);
   const [participantId, setParticipantId] = useState<string | null>(null);
@@ -70,12 +85,49 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     if (challenge) {
       localStorage.setItem('challenge', JSON.stringify(challenge));
+      // Also update the challenge in the shared store
+      updateChallenge(challenge);
     }
     
     if (participantId) {
       localStorage.setItem('participantId', participantId);
     }
   }, [challenge, participantId]);
+
+  // Poll for updates to the challenge
+  useEffect(() => {
+    if (!challenge || !challenge.id) return;
+
+    // Don't poll if the challenge is completed or active
+    if (challenge.status !== 'waiting') return;
+
+    const checkForUpdates = () => {
+      const allChallenges = getAllChallenges();
+      const latestChallenge = allChallenges[challenge.id];
+      
+      if (latestChallenge && JSON.stringify(latestChallenge) !== JSON.stringify(challenge)) {
+        // Preserve the current participant's information
+        if (participantId && latestChallenge.participants) {
+          // Make sure we don't lose our own participant data during sync
+          if (!latestChallenge.participants[participantId] && challenge.participants[participantId]) {
+            latestChallenge.participants[participantId] = challenge.participants[participantId];
+          }
+        }
+        
+        setChallenge(latestChallenge);
+        
+        // If challenge status changed to active, navigate to duel page
+        if (latestChallenge.status === 'active' && challenge.status === 'waiting') {
+          navigate(`/duel/${challenge.id}`);
+          toast.success("Challenge started!");
+        }
+      }
+    };
+
+    const intervalId = setInterval(checkForUpdates, 2000); // Check every 2 seconds
+    
+    return () => clearInterval(intervalId);
+  }, [challenge, participantId, navigate]);
 
   // Check if challenge is active and user left the page
   useEffect(() => {
@@ -151,31 +203,20 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     
     setChallenge(newChallenge);
     setParticipantId(userId);
+    updateChallenge(newChallenge); // Store in the shared challenge store
     navigate(`/invite/${challengeId}`);
     
     return challengeId;
   };
 
   const joinChallenge = (challengeId: string, name: string, reward: string) => {
-    // First check if the challenge exists in localStorage
-    const existingChallengeJson = localStorage.getItem('challenge');
-    let existingChallenge: ChallengeType | null = null;
+    // Get challenge from the shared store
+    const allChallenges = getAllChallenges();
+    const existingChallenge = allChallenges[challengeId];
     
-    if (existingChallengeJson) {
-      try {
-        const parsed = JSON.parse(existingChallengeJson);
-        if (parsed && parsed.id === challengeId) {
-          existingChallenge = parsed;
-        }
-      } catch (e) {
-        console.error("Error parsing stored challenge:", e);
-      }
-    }
-
-    if (existingChallenge && existingChallenge.id === challengeId) {
-      // If this challenge already exists, add the participant
+    if (existingChallenge) {
+      // Add the participant
       const userId = generateId();
-      
       const updatedChallenge: ChallengeType = {
         ...existingChallenge,
         participants: {
@@ -190,6 +231,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       
       setChallenge(updatedChallenge);
       setParticipantId(userId);
+      updateChallenge(updatedChallenge); // Update the shared store
       navigate(`/waiting/${challengeId}`);
     } else {
       // We don't have the challenge stored, create a temporary one
@@ -214,6 +256,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       
       setChallenge(newChallenge);
       setParticipantId(userId);
+      updateChallenge(newChallenge); // Store in the shared challenge store
       navigate(`/waiting/${challengeId}`);
     }
   };
@@ -241,6 +284,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
     
     setChallenge(updatedChallenge);
+    updateChallenge(updatedChallenge); // Update the shared store
     navigate(`/duel/${challenge.id}`);
   };
 
@@ -272,6 +316,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
     
     setChallenge(updatedChallenge);
+    updateChallenge(updatedChallenge); // Update the shared store
     navigate(`/results/${challenge.id}`);
     toast.error("You looked at your phone! You lost the challenge.");
   };
@@ -297,6 +342,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
     
     setChallenge(updatedChallenge);
+    updateChallenge(updatedChallenge); // Update the shared store
     navigate(`/results/${challenge.id}`);
     toast.success("Challenge completed successfully!");
   };

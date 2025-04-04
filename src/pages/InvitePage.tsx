@@ -3,11 +3,12 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Check, Copy, Share2 } from 'lucide-react';
+import { Check, Copy, Share2, Users } from 'lucide-react';
 import Layout from '@/components/Layout';
 import DuelCard from '@/components/DuelCard';
 import { useChallenge } from '@/contexts/ChallengeContext';
 import { toast } from 'sonner';
+import ParticipantCard from '@/components/ParticipantCard';
 
 const InvitePage: React.FC = () => {
   const { challengeId } = useParams<{ challengeId: string }>();
@@ -60,6 +61,9 @@ const InvitePage: React.FC = () => {
   };
 
   if (!challenge) return null;
+
+  const participants = Object.entries(challenge.participants);
+  const waitingCount = participants.length < 2 ? 1 : 0;
 
   return (
     <Layout>
@@ -115,6 +119,26 @@ const InvitePage: React.FC = () => {
             </div>
           </div>
 
+          {participants.length > 1 && (
+            <div>
+              <div className="flex items-center mb-3">
+                <Users className="h-5 w-5 text-duel-purple mr-2" />
+                <h3 className="text-md font-medium">Current Participants</h3>
+              </div>
+              <div className="space-y-3 mb-4">
+                {participants.map(([id, participant]) => (
+                  <ParticipantCard
+                    key={id}
+                    name={participant.name}
+                    reward={participant.reward}
+                    status={participant.status}
+                    isCurrentUser={false}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           <Button 
             className="w-full bg-duel-gradient hover:opacity-90 transition-opacity"
             onClick={handleContinue}
@@ -126,7 +150,9 @@ const InvitePage: React.FC = () => {
 
       <div className="text-center">
         <p className="text-sm text-gray-500">
-          Waiting for 1 friend to join
+          {waitingCount > 0 
+            ? `Waiting for ${waitingCount} friend to join` 
+            : "Friends have joined! You can continue to the waiting room."}
         </p>
       </div>
     </Layout>
