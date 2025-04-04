@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,7 @@ import TimeSelector from '@/components/TimeSelector';
 import { useChallenge } from '@/contexts/ChallengeContext';
 import { PhoneOff, Link } from 'lucide-react';
 import { toast } from 'sonner';
+
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const {
@@ -18,6 +20,7 @@ const HomePage: React.FC = () => {
   const [reward, setReward] = useState('');
   const [challengeId, setChallengeId] = useState('');
   const [isJoining, setIsJoining] = useState(false);
+
   const handleCreateChallenge = () => {
     if (!name.trim()) {
       toast.error("Please enter your name");
@@ -25,6 +28,7 @@ const HomePage: React.FC = () => {
     }
     createChallenge(name, duration, reward);
   };
+
   const handleJoinChallenge = () => {
     if (!challengeId.trim()) {
       toast.error("Please enter a challenge code");
@@ -32,6 +36,7 @@ const HomePage: React.FC = () => {
     }
     navigate(`/join/${challengeId}`);
   };
+
   return <Layout>
       <div className="text-center mb-4">
         <div className="inline-flex items-center justify-center p-4 rounded-full bg-duel-light mb-2 relative w-16 h-16">
@@ -91,6 +96,17 @@ const HomePage: React.FC = () => {
             </div>}
         </Button>
       </div>
+
+      <div className="mt-8 text-xs text-center text-gray-500 px-4">
+        <p className="mb-2">How it works across devices:</p>
+        <ul className="space-y-1 list-disc list-inside text-left max-w-xs mx-auto">
+          <li>Create a challenge on your device</li>
+          <li>Share the challenge code with friends</li>
+          <li>Friends enter the code on their devices</li>
+          <li>All participants see the same challenge in real-time</li>
+        </ul>
+      </div>
     </Layout>;
 };
+
 export default HomePage;
