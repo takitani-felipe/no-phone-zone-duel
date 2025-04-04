@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -34,7 +33,7 @@ const HomePage: React.FC = () => {
         <div className="inline-flex p-4 rounded-full bg-duel-light mb-4">
           <PhoneOff className="h-8 w-8 text-duel-purple" />
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">No Phone Zone Duel</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Focus Fight</h2>
         <p className="text-gray-600">Challenge a friend to stay off your phones and win rewards.</p>
       </div>
 

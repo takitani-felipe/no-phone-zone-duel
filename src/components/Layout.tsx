@@ -11,7 +11,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <header className="mb-8 pt-6">
         <div className="container max-w-lg mx-auto text-center">
           <h1 className="text-2xl md:text-3xl font-bold bg-duel-gradient bg-clip-text text-transparent">
-            No Phone Zone Duel
+            Focus Fight
           </h1>
         </div>
       </header>
