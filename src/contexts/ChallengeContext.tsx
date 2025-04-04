@@ -2,6 +2,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { createClient } from '@supabase/supabase-js';
+
+// Initialize Supabase client
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 type ParticipantStatus = 'waiting' | 'active' | 'lost' | 'won';
 type ChallengeStatus = 'waiting' | 'active' | 'completed';
@@ -47,47 +53,31 @@ const ChallengeContext = createContext<ChallengeContextType>(defaultContext);
 
 export const useChallenge = () => useContext(ChallengeContext);
 
-// Define key for storing challenges in localStorage
-const CHALLENGE_STORE_KEY = 'all_challenges';
-
-// Base URL for our mock server
-const SERVER_BASE_URL = 'https://mockapi.lovable.dev/challenges';
-
-// Helper functions for managing storage and syncing with mock server
-const getAllChallenges = async (): Promise<Record<string, ChallengeType>> => {
-  try {
-    const response = await fetch(`${SERVER_BASE_URL}`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch challenges');
-    }
-    const data = await response.json();
-    return data || {};
-  } catch (error) {
-    console.error('Error fetching challenges:', error);
-    // Fallback to local storage if server fails
-    const challengesJson = localStorage.getItem(CHALLENGE_STORE_KEY);
-    return challengesJson ? JSON.parse(challengesJson) : {};
-  }
-};
-
+// Helper functions for managing storage and syncing with Supabase
 const getChallenge = async (challengeId: string): Promise<ChallengeType | null> => {
   try {
-    const response = await fetch(`${SERVER_BASE_URL}/${challengeId}`);
-    if (!response.ok) {
-      if (response.status === 404) {
-        return null; // Challenge not found
-      }
-      throw new Error('Failed to fetch challenge');
+    const { data, error } = await supabase
+      .from('challenges')
+      .select('*')
+      .eq('id', challengeId)
+      .single();
+    
+    if (error) {
+      throw error;
     }
-    return await response.json();
+    
+    return data as ChallengeType;
   } catch (error) {
     console.error(`Error fetching challenge ${challengeId}:`, error);
-    // Fallback to local storage
-    const allChallenges = localStorage.getItem(CHALLENGE_STORE_KEY);
-    if (allChallenges) {
-      const parsed = JSON.parse(allChallenges);
-      return parsed[challengeId] || null;
+    
+    // Fallback to local storage if Supabase fails
+    const challengeJson = localStorage.getItem('challenge');
+    const storedChallenge = challengeJson ? JSON.parse(challengeJson) : null;
+    
+    if (storedChallenge && storedChallenge.id === challengeId) {
+      return storedChallenge;
     }
+    
     return null;
   }
 };
@@ -96,33 +86,22 @@ const updateChallenge = async (challenge: ChallengeType): Promise<void> => {
   if (!challenge || !challenge.id) return;
   
   try {
-    const response = await fetch(`${SERVER_BASE_URL}/${challenge.id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(challenge),
-    });
+    const { error } = await supabase
+      .from('challenges')
+      .upsert(challenge, { onConflict: 'id' });
     
-    if (!response.ok) {
-      throw new Error('Failed to update challenge');
+    if (error) {
+      throw error;
     }
     
     // Also update local cache
-    const allChallenges = localStorage.getItem(CHALLENGE_STORE_KEY);
-    const parsed = allChallenges ? JSON.parse(allChallenges) : {};
-    parsed[challenge.id] = challenge;
-    localStorage.setItem(CHALLENGE_STORE_KEY, JSON.stringify(parsed));
-    
+    localStorage.setItem('challenge', JSON.stringify(challenge));
   } catch (error) {
     console.error('Error updating challenge:', error);
-    toast.error("Failed to sync with server. Challenge may not update for others.");
+    toast.error("Failed to sync with database. Challenge may not update for others.");
     
     // Still update local cache as fallback
-    const allChallenges = localStorage.getItem(CHALLENGE_STORE_KEY);
-    const parsed = allChallenges ? JSON.parse(allChallenges) : {};
-    parsed[challenge.id] = challenge;
-    localStorage.setItem(CHALLENGE_STORE_KEY, JSON.stringify(parsed));
+    localStorage.setItem('challenge', JSON.stringify(challenge));
   }
 };
 
@@ -149,7 +128,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     if (challenge) {
       localStorage.setItem('challenge', JSON.stringify(challenge));
-      // Update the challenge in the shared store
+      // Update the challenge in Supabase
       updateChallenge(challenge);
     }
     
@@ -158,10 +137,41 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, [challenge, participantId]);
 
-  // Poll for updates to the challenge
+  // Set up real-time subscription to the challenge
   useEffect(() => {
     if (!challenge || !challenge.id) return;
 
+    // Set up real-time subscription
+    const subscription = supabase
+      .channel(`challenge-${challenge.id}`)
+      .on('postgres_changes', { 
+        event: 'UPDATE',
+        schema: 'public', 
+        table: 'challenges',
+        filter: `id=eq.${challenge.id}`
+      }, (payload) => {
+        const updatedChallenge = payload.new as ChallengeType;
+        
+        if (JSON.stringify(updatedChallenge) !== JSON.stringify(challenge)) {
+          // Preserve the current participant's information during sync
+          if (participantId && updatedChallenge.participants) {
+            if (!updatedChallenge.participants[participantId] && challenge.participants[participantId]) {
+              updatedChallenge.participants[participantId] = challenge.participants[participantId];
+            }
+          }
+          
+          setChallenge(updatedChallenge);
+          
+          // If challenge status changed to active, navigate to duel page
+          if (updatedChallenge.status === 'active' && challenge.status === 'waiting') {
+            navigate(`/duel/${challenge.id}`);
+            toast.success("Challenge started!");
+          }
+        }
+      })
+      .subscribe();
+
+    // Fallback polling mechanism in case the subscription fails
     const checkForUpdates = async () => {
       try {
         const latestChallenge = await getChallenge(challenge.id);
@@ -169,7 +179,6 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (latestChallenge && JSON.stringify(latestChallenge) !== JSON.stringify(challenge)) {
           // Preserve the current participant's information
           if (participantId && latestChallenge.participants) {
-            // Make sure we don't lose our own participant data during sync
             if (!latestChallenge.participants[participantId] && challenge.participants[participantId]) {
               latestChallenge.participants[participantId] = challenge.participants[participantId];
             }
@@ -188,9 +197,12 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
     };
 
-    const intervalId = setInterval(checkForUpdates, 2000); // Check every 2 seconds
+    const intervalId = setInterval(checkForUpdates, 5000); // Check every 5 seconds as a fallback
     
-    return () => clearInterval(intervalId);
+    return () => {
+      subscription.unsubscribe();
+      clearInterval(intervalId);
+    };
   }, [challenge, participantId, navigate]);
 
   // Check if challenge is active and user left the page
@@ -267,14 +279,14 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     
     setChallenge(newChallenge);
     setParticipantId(userId);
-    updateChallenge(newChallenge); // Store in the shared challenge store
+    updateChallenge(newChallenge); // Store in Supabase
     navigate(`/invite/${challengeId}`);
     
     return challengeId;
   };
 
   const joinChallenge = async (challengeId: string, name: string, reward: string) => {
-    // Get challenge from the shared store
+    // Get challenge from Supabase
     const existingChallenge = await getChallenge(challengeId);
     
     if (existingChallenge) {
@@ -294,7 +306,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       
       setChallenge(updatedChallenge);
       setParticipantId(userId);
-      await updateChallenge(updatedChallenge); // Update the shared store
+      await updateChallenge(updatedChallenge); // Update in Supabase
       navigate(`/waiting/${challengeId}`);
     } else {
       toast.error("Challenge not found. Check the code and try again.");
@@ -320,7 +332,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       
       setChallenge(newChallenge);
       setParticipantId(userId);
-      await updateChallenge(newChallenge); // Store in the shared challenge store
+      await updateChallenge(newChallenge); // Store in Supabase
       navigate(`/waiting/${challengeId}`);
     }
   };
@@ -348,7 +360,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
     
     setChallenge(updatedChallenge);
-    await updateChallenge(updatedChallenge); // Update the shared store
+    await updateChallenge(updatedChallenge); // Update in Supabase
     navigate(`/duel/${challenge.id}`);
   };
 
@@ -391,7 +403,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
     
     setChallenge(updatedChallenge);
-    await updateChallenge(updatedChallenge); // Update the shared store
+    await updateChallenge(updatedChallenge); // Update in Supabase
     
     if (updatedStatus === 'completed') {
       navigate(`/results/${challenge.id}`);
@@ -421,7 +433,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
     
     setChallenge(updatedChallenge);
-    await updateChallenge(updatedChallenge); // Update the shared store
+    await updateChallenge(updatedChallenge); // Update in Supabase
     navigate(`/results/${challenge.id}`);
     toast.success("Challenge completed successfully!");
   };

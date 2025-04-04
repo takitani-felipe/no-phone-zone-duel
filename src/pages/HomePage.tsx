@@ -7,7 +7,7 @@ import Layout from '@/components/Layout';
 import DuelCard from '@/components/DuelCard';
 import TimeSelector from '@/components/TimeSelector';
 import { useChallenge } from '@/contexts/ChallengeContext';
-import { PhoneOff, Link, CloudOff } from 'lucide-react';
+import { PhoneOff, Link, Database } from 'lucide-react';
 import { toast } from 'sonner';
 
 const HomePage: React.FC = () => {
@@ -108,9 +108,9 @@ const HomePage: React.FC = () => {
       </div>
 
       <div className="mt-4 text-center">
-        <div className="flex items-center justify-center gap-1 text-sm text-duel-purple">
-          <CloudOff className="h-4 w-4" />
-          <span>Connected to mock server for device syncing</span>
+        <div className="flex items-center justify-center gap-1 text-sm text-green-600">
+          <Database className="h-4 w-4" />
+          <span>Connected to Supabase for real-time challenge syncing</span>
         </div>
       </div>
     </Layout>;
