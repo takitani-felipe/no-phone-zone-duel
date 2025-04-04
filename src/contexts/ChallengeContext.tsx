@@ -50,16 +50,80 @@ export const useChallenge = () => useContext(ChallengeContext);
 // Define key for storing challenges in localStorage
 const CHALLENGE_STORE_KEY = 'all_challenges';
 
-// Helper functions for managing localStorage
-const getAllChallenges = (): Record<string, ChallengeType> => {
-  const challengesJson = localStorage.getItem(CHALLENGE_STORE_KEY);
-  return challengesJson ? JSON.parse(challengesJson) : {};
+// Base URL for our mock server
+const SERVER_BASE_URL = 'https://mockapi.lovable.dev/challenges';
+
+// Helper functions for managing storage and syncing with mock server
+const getAllChallenges = async (): Promise<Record<string, ChallengeType>> => {
+  try {
+    const response = await fetch(`${SERVER_BASE_URL}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch challenges');
+    }
+    const data = await response.json();
+    return data || {};
+  } catch (error) {
+    console.error('Error fetching challenges:', error);
+    // Fallback to local storage if server fails
+    const challengesJson = localStorage.getItem(CHALLENGE_STORE_KEY);
+    return challengesJson ? JSON.parse(challengesJson) : {};
+  }
 };
 
-const updateChallenge = (challenge: ChallengeType) => {
-  const allChallenges = getAllChallenges();
-  allChallenges[challenge.id] = challenge;
-  localStorage.setItem(CHALLENGE_STORE_KEY, JSON.stringify(allChallenges));
+const getChallenge = async (challengeId: string): Promise<ChallengeType | null> => {
+  try {
+    const response = await fetch(`${SERVER_BASE_URL}/${challengeId}`);
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null; // Challenge not found
+      }
+      throw new Error('Failed to fetch challenge');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error(`Error fetching challenge ${challengeId}:`, error);
+    // Fallback to local storage
+    const allChallenges = localStorage.getItem(CHALLENGE_STORE_KEY);
+    if (allChallenges) {
+      const parsed = JSON.parse(allChallenges);
+      return parsed[challengeId] || null;
+    }
+    return null;
+  }
+};
+
+const updateChallenge = async (challenge: ChallengeType): Promise<void> => {
+  if (!challenge || !challenge.id) return;
+  
+  try {
+    const response = await fetch(`${SERVER_BASE_URL}/${challenge.id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(challenge),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to update challenge');
+    }
+    
+    // Also update local cache
+    const allChallenges = localStorage.getItem(CHALLENGE_STORE_KEY);
+    const parsed = allChallenges ? JSON.parse(allChallenges) : {};
+    parsed[challenge.id] = challenge;
+    localStorage.setItem(CHALLENGE_STORE_KEY, JSON.stringify(parsed));
+    
+  } catch (error) {
+    console.error('Error updating challenge:', error);
+    toast.error("Failed to sync with server. Challenge may not update for others.");
+    
+    // Still update local cache as fallback
+    const allChallenges = localStorage.getItem(CHALLENGE_STORE_KEY);
+    const parsed = allChallenges ? JSON.parse(allChallenges) : {};
+    parsed[challenge.id] = challenge;
+    localStorage.setItem(CHALLENGE_STORE_KEY, JSON.stringify(parsed));
+  }
 };
 
 export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -85,7 +149,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     if (challenge) {
       localStorage.setItem('challenge', JSON.stringify(challenge));
-      // Also update the challenge in the shared store
+      // Update the challenge in the shared store
       updateChallenge(challenge);
     }
     
@@ -98,29 +162,29 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     if (!challenge || !challenge.id) return;
 
-    // Don't poll if the challenge is completed or active
-    if (challenge.status !== 'waiting') return;
-
-    const checkForUpdates = () => {
-      const allChallenges = getAllChallenges();
-      const latestChallenge = allChallenges[challenge.id];
-      
-      if (latestChallenge && JSON.stringify(latestChallenge) !== JSON.stringify(challenge)) {
-        // Preserve the current participant's information
-        if (participantId && latestChallenge.participants) {
-          // Make sure we don't lose our own participant data during sync
-          if (!latestChallenge.participants[participantId] && challenge.participants[participantId]) {
-            latestChallenge.participants[participantId] = challenge.participants[participantId];
+    const checkForUpdates = async () => {
+      try {
+        const latestChallenge = await getChallenge(challenge.id);
+        
+        if (latestChallenge && JSON.stringify(latestChallenge) !== JSON.stringify(challenge)) {
+          // Preserve the current participant's information
+          if (participantId && latestChallenge.participants) {
+            // Make sure we don't lose our own participant data during sync
+            if (!latestChallenge.participants[participantId] && challenge.participants[participantId]) {
+              latestChallenge.participants[participantId] = challenge.participants[participantId];
+            }
+          }
+          
+          setChallenge(latestChallenge);
+          
+          // If challenge status changed to active, navigate to duel page
+          if (latestChallenge.status === 'active' && challenge.status === 'waiting') {
+            navigate(`/duel/${challenge.id}`);
+            toast.success("Challenge started!");
           }
         }
-        
-        setChallenge(latestChallenge);
-        
-        // If challenge status changed to active, navigate to duel page
-        if (latestChallenge.status === 'active' && challenge.status === 'waiting') {
-          navigate(`/duel/${challenge.id}`);
-          toast.success("Challenge started!");
-        }
+      } catch (error) {
+        console.error('Error checking for updates:', error);
       }
     };
 
@@ -209,10 +273,9 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return challengeId;
   };
 
-  const joinChallenge = (challengeId: string, name: string, reward: string) => {
+  const joinChallenge = async (challengeId: string, name: string, reward: string) => {
     // Get challenge from the shared store
-    const allChallenges = getAllChallenges();
-    const existingChallenge = allChallenges[challengeId];
+    const existingChallenge = await getChallenge(challengeId);
     
     if (existingChallenge) {
       // Add the participant
@@ -231,9 +294,10 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       
       setChallenge(updatedChallenge);
       setParticipantId(userId);
-      updateChallenge(updatedChallenge); // Update the shared store
+      await updateChallenge(updatedChallenge); // Update the shared store
       navigate(`/waiting/${challengeId}`);
     } else {
+      toast.error("Challenge not found. Check the code and try again.");
       // We don't have the challenge stored, create a temporary one
       const userId = generateId();
       
@@ -256,12 +320,12 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       
       setChallenge(newChallenge);
       setParticipantId(userId);
-      updateChallenge(newChallenge); // Store in the shared challenge store
+      await updateChallenge(newChallenge); // Store in the shared challenge store
       navigate(`/waiting/${challengeId}`);
     }
   };
 
-  const startChallenge = () => {
+  const startChallenge = async () => {
     if (!challenge) return;
     
     const now = Date.now();
@@ -284,11 +348,11 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
     
     setChallenge(updatedChallenge);
-    updateChallenge(updatedChallenge); // Update the shared store
+    await updateChallenge(updatedChallenge); // Update the shared store
     navigate(`/duel/${challenge.id}`);
   };
 
-  const handleLoss = () => {
+  const handleLoss = async () => {
     if (!challenge || !participantId) return;
     
     // Update this participant's status to lost
@@ -327,7 +391,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
     
     setChallenge(updatedChallenge);
-    updateChallenge(updatedChallenge); // Update the shared store
+    await updateChallenge(updatedChallenge); // Update the shared store
     
     if (updatedStatus === 'completed') {
       navigate(`/results/${challenge.id}`);
@@ -336,7 +400,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     toast.error("You looked at your phone! You lost the challenge.");
   };
 
-  const completeChallenge = () => {
+  const completeChallenge = async () => {
     if (!challenge) return;
     
     // Everyone who is still active has won
@@ -357,7 +421,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
     
     setChallenge(updatedChallenge);
-    updateChallenge(updatedChallenge); // Update the shared store
+    await updateChallenge(updatedChallenge); // Update the shared store
     navigate(`/results/${challenge.id}`);
     toast.success("Challenge completed successfully!");
   };
