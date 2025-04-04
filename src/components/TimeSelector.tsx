@@ -31,10 +31,10 @@ const TimeSelector: React.FC<TimeSelectorProps> = ({ value, onChange }) => {
       />
       
       <div className="flex justify-between text-xs text-gray-500">
-        <span>5m</span>
-        <span>30m</span>
-        <span>60m</span>
-        <span>120m</span>
+        <span className="ml-0">5m</span>
+        <span className="ml-[calc(21.7%-5px)]">30m</span>
+        <span className="ml-[calc(18.3%-5px)]">60m</span>
+        <span className="mr-0">120m</span>
       </div>
     </div>
   );
