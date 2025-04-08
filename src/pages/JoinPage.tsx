@@ -7,6 +7,7 @@ import Layout from '@/components/Layout';
 import DuelCard from '@/components/DuelCard';
 import { useChallenge } from '@/contexts/ChallengeContext';
 import { UserIcon } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 const JoinPage: React.FC = () => {
   const { challengeId } = useParams<{ challengeId: string }>();
@@ -14,21 +15,51 @@ const JoinPage: React.FC = () => {
   const { joinChallenge } = useChallenge();
   const [name, setName] = useState('');
   const [ownerReward, setOwnerReward] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get the challenge information from localStorage to show the owner's reward
-    if (challengeId) {
-      const allChallenges = getAllChallenges();
-      const challenge = allChallenges[challengeId];
-      
-      if (challenge) {
-        // Find the creator's participant entry
-        const creatorId = challenge.createdBy;
-        if (creatorId && challenge.participants[creatorId]) {
-          setOwnerReward(challenge.participants[creatorId].reward || 'Nothing specified');
+    if (!challengeId) return;
+    
+    const fetchChallengeInfo = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('challenges')
+          .select('*')
+          .eq('id', challengeId)
+          .single();
+        
+        if (error) {
+          console.error('Error fetching challenge:', error);
+          throw error;
         }
+        
+        if (data) {
+          const creatorId = data.created_by;
+          const participants = data.participants || {};
+          
+          if (creatorId && participants[creatorId]) {
+            setOwnerReward(participants[creatorId].reward || 'Nothing specified');
+          }
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        // Fallback to localStorage
+        const challengeJson = localStorage.getItem('challenge');
+        const challenge = challengeJson ? JSON.parse(challengeJson) : null;
+        
+        if (challenge && challenge.id === challengeId) {
+          const creatorId = challenge.createdBy;
+          if (creatorId && challenge.participants[creatorId]) {
+            setOwnerReward(challenge.participants[creatorId].reward || 'Nothing specified');
+          }
+        }
+      } finally {
+        setLoading(false);
       }
-    }
+    };
+    
+    fetchChallengeInfo();
   }, [challengeId]);
 
   const handleJoinChallenge = () => {
@@ -38,12 +69,6 @@ const JoinPage: React.FC = () => {
 
   const handleCancel = () => {
     navigate('/');
-  };
-
-  // Helper function to get all challenges from localStorage
-  const getAllChallenges = (): Record<string, any> => {
-    const challengesJson = localStorage.getItem('all_challenges');
-    return challengesJson ? JSON.parse(challengesJson) : {};
   };
 
   return (
@@ -70,7 +95,9 @@ const JoinPage: React.FC = () => {
             />
           </div>
           
-          {ownerReward && (
+          {loading ? (
+            <div className="animate-pulse bg-gray-100 h-20 rounded-lg"></div>
+          ) : ownerReward ? (
             <div className="bg-gray-50 p-4 rounded-lg">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 What's at stake
@@ -78,7 +105,7 @@ const JoinPage: React.FC = () => {
               <p className="text-gray-800">{ownerReward}</p>
               <p className="text-xs text-gray-500 mt-1">Set by the challenge creator</p>
             </div>
-          )}
+          ) : null}
 
           <div className="space-y-2">
             <Button 

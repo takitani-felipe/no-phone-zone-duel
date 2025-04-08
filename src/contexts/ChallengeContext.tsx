@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -112,7 +111,8 @@ const updateChallenge = async (challenge: ChallengeType): Promise<void> => {
     
     const { error } = await supabase
       .from('challenges')
-      .upsert(dbChallenge, { onConflict: 'id' });
+      .upsert(dbChallenge)
+      .select();
     
     if (error) {
       throw error;
@@ -285,10 +285,9 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     // Generate unique IDs
     const userId = generateId();
     
-    // Create challenge object for our app format
-    const newChallenge: ChallengeType = {
-      id: '', // Will be assigned by Supabase
-      createdBy: userId,
+    // Create challenge data format for database
+    const dbChallenge = {
+      created_by: userId,
       duration,
       reward: '',
       participants: {
@@ -299,22 +298,11 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
       },
       status: 'waiting',
-      startTime: null,
-      endTime: null
+      start_time: null,
+      end_time: null
     };
     
     try {
-      // Format for database
-      const dbChallenge = {
-        created_by: newChallenge.createdBy,
-        duration: newChallenge.duration,
-        reward: newChallenge.reward,
-        participants: newChallenge.participants,
-        status: newChallenge.status,
-        start_time: newChallenge.startTime,
-        end_time: newChallenge.endTime
-      };
-      
       // Insert into Supabase
       const { data, error } = await supabase
         .from('challenges')
@@ -323,13 +311,20 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         .single();
       
       if (error) {
+        console.error('Error creating challenge:', error);
         throw error;
       }
       
-      // Update our challenge with the ID from Supabase
+      // Create our app's challenge format
       const createdChallenge: ChallengeType = {
-        ...newChallenge,
-        id: data.id
+        id: data.id,
+        createdBy: data.created_by,
+        duration: data.duration,
+        reward: data.reward || '',
+        participants: data.participants as ChallengeType['participants'],
+        status: data.status as ChallengeStatus,
+        startTime: data.start_time,
+        endTime: data.end_time
       };
       
       setChallenge(createdChallenge);
