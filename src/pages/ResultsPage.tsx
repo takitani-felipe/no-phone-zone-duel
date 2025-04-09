@@ -21,8 +21,6 @@ const ResultsPage: React.FC = () => {
       return;
     }
     
-    // Don't redirect based on status anymore, just show appropriate content
-    
     // Show confetti for winners
     if (participantId && challenge.participants[participantId]?.status === 'won') {
       launchConfetti();
