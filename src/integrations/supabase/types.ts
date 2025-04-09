@@ -12,17 +12,73 @@ export type Database = {
       challenges: {
         Row: {
           created_at: string
-          id: number
+          created_by: string
+          duration: number
+          end_time: number | null
+          id: string
+          participants: Json
+          reward: string | null
+          start_time: number | null
+          status: string
         }
         Insert: {
           created_at?: string
-          id?: number
+          created_by: string
+          duration: number
+          end_time?: number | null
+          id?: string
+          participants?: Json
+          reward?: string | null
+          start_time?: number | null
+          status?: string
         }
         Update: {
           created_at?: string
-          id?: number
+          created_by?: string
+          duration?: number
+          end_time?: number | null
+          id?: string
+          participants?: Json
+          reward?: string | null
+          start_time?: number | null
+          status?: string
         }
         Relationships: []
+      }
+      participants: {
+        Row: {
+          challenge_id: string | null
+          id: string
+          is_winner: boolean | null
+          joined_at: string | null
+          left_screen_at: string | null
+          name: string
+        }
+        Insert: {
+          challenge_id?: string | null
+          id?: string
+          is_winner?: boolean | null
+          joined_at?: string | null
+          left_screen_at?: string | null
+          name: string
+        }
+        Update: {
+          challenge_id?: string | null
+          id?: string
+          is_winner?: boolean | null
+          joined_at?: string | null
+          left_screen_at?: string | null
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "participants_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "challenges"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
