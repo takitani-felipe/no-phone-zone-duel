@@ -501,3 +501,5 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     </ChallengeContext.Provider>
   );
 };
+
+export default ChallengeProvider;
