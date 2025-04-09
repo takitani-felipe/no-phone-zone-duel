@@ -6,7 +6,7 @@ import Layout from '@/components/Layout';
 import DuelCard from '@/components/DuelCard';
 import ParticipantCard from '@/components/ParticipantCard';
 import { useChallenge } from '@/contexts/ChallengeContext';
-import { Trophy, Home } from 'lucide-react';
+import { Trophy, Home, Award } from 'lucide-react';
 
 const ResultsPage: React.FC = () => {
   const { challengeId } = useParams<{ challengeId: string }>();
@@ -22,6 +22,10 @@ const ResultsPage: React.FC = () => {
   const handleNewChallenge = () => {
     resetChallenge();
     navigate('/');
+  };
+
+  const handleViewReward = () => {
+    navigate(`/winner/${challengeId}`);
   };
 
   if (!challenge || !participantId) return null;
@@ -95,6 +99,17 @@ const ResultsPage: React.FC = () => {
               </div>
             )}
           </div>
+
+          {hasWon && wonRewards.length > 0 && (
+            <Button
+              variant="outline"
+              className="w-full border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800"
+              onClick={handleViewReward}
+            >
+              <Award className="h-4 w-4 mr-2" />
+              View Your Reward
+            </Button>
+          )}
 
           <Button 
             className="w-full bg-duel-gradient hover:opacity-90 transition-opacity"
