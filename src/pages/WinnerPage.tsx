@@ -7,6 +7,7 @@ import DuelCard from '@/components/DuelCard';
 import { useChallenge } from '@/contexts/ChallengeContext';
 import { Trophy, Gift, Home, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { toast } from 'sonner';
 
 const WinnerPage: React.FC = () => {
   const { challengeId } = useParams<{ challengeId: string }>();
@@ -14,16 +15,23 @@ const WinnerPage: React.FC = () => {
   const { challenge, participantId, resetChallenge } = useChallenge();
 
   useEffect(() => {
-    // Redirect to home if not a valid challenge or participant
-    if (!challenge || challenge.id !== challengeId || !participantId) {
+    // Only check if challenge exists and match ID
+    if (!challenge || challenge.id !== challengeId) {
       navigate('/');
       return;
     }
 
-    // Redirect if participant didn't win
+    // Check if participant exists
+    if (!participantId || !challenge.participants[participantId]) {
+      navigate('/');
+      return;
+    }
+
+    // Only check if they won, don't redirect otherwise
     const currentParticipant = challenge.participants[participantId];
-    if (!currentParticipant || currentParticipant.status !== 'won') {
-      navigate(`/results/${challengeId}`);
+    if (currentParticipant.status !== 'won') {
+      // Instead of redirect, show a toast and stay on the page
+      toast.error("You didn't win this challenge.");
       return;
     }
 
@@ -108,13 +116,13 @@ const WinnerPage: React.FC = () => {
                 </div>
                 
                 <p className="text-sm text-gray-500">
-                  You also kept your {selfReward} safe from others!
+                  You also kept your {selfReward || "reward"} safe from others!
                 </p>
               </div>
             ) : (
               <div className="p-6">
                 <p className="text-gray-600">
-                  You kept your {selfReward} safe!
+                  You kept your {selfReward || "reward"} safe!
                 </p>
                 <p className="text-sm text-gray-500 mt-2">
                   No one else put up rewards in this challenge.

@@ -100,7 +100,7 @@ const ResultsPage: React.FC = () => {
             )}
           </div>
 
-          {hasWon && wonRewards.length > 0 && (
+          {hasWon && (
             <Button
               variant="outline"
               className="w-full border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800"
