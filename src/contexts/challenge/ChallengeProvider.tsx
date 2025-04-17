@@ -45,13 +45,17 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const joinChallenge = async (challengeId: string, name: string, reward: string) => {
+    // Import the getChallenge function from challengeApi
+    const { getChallenge } = await import('./challengeApi');
+    
     return joinChallengeAction(
       challengeId, 
       name, 
       reward, 
       setStoredChallenge, 
       setStoredParticipantId, 
-      navigate
+      navigate,
+      getChallenge // Add the missing 7th argument
     );
   };
 
