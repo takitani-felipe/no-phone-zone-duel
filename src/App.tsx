@@ -12,7 +12,6 @@ import InvitePage from "./pages/InvitePage";
 import WaitingPage from "./pages/WaitingPage";
 import DuelPage from "./pages/DuelPage";
 import ResultsPage from "./pages/ResultsPage";
-import WinnerPage from "./pages/WinnerPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,7 +30,6 @@ const App = () => (
             <Route path="/waiting/:challengeId" element={<WaitingPage />} />
             <Route path="/duel/:challengeId" element={<DuelPage />} />
             <Route path="/results/:challengeId" element={<ResultsPage />} />
-            <Route path="/winner/:challengeId" element={<WinnerPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </ChallengeProvider>

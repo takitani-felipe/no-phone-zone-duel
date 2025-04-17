@@ -47,7 +47,6 @@ const ChallengeContext = createContext<ChallengeContextType>(defaultContext);
 
 export const useChallenge = () => useContext(ChallengeContext);
 
-// Helper functions for managing challenges with Supabase
 const getChallenge = async (challengeId: string): Promise<ChallengeType | null> => {
   try {
     const { data, error } = await supabase
@@ -62,7 +61,6 @@ const getChallenge = async (challengeId: string): Promise<ChallengeType | null> 
     
     if (!data) return null;
     
-    // Transform the database record into our app's challenge format
     const challenge: ChallengeType = {
       id: data.id,
       createdBy: data.created_by,
@@ -78,7 +76,6 @@ const getChallenge = async (challengeId: string): Promise<ChallengeType | null> 
   } catch (error) {
     console.error(`Error fetching challenge ${challengeId}:`, error);
     
-    // Fallback to local storage if Supabase fails
     const challengeJson = localStorage.getItem('challenge');
     const storedChallenge = challengeJson ? JSON.parse(challengeJson) : null;
     
@@ -93,11 +90,9 @@ const getChallenge = async (challengeId: string): Promise<ChallengeType | null> 
 const updateChallenge = async (challenge: ChallengeType): Promise<void> => {
   if (!challenge || !challenge.id) return;
   
-  // Update local cache for faster UI updates
   localStorage.setItem('challenge', JSON.stringify(challenge));
   
   try {
-    // Transform our app's challenge format into the database record format
     const dbChallenge = {
       id: challenge.id,
       created_by: challenge.createdBy,
@@ -128,7 +123,6 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [participantId, setParticipantId] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // Load challenge from localStorage (for initial load or fallback)
   useEffect(() => {
     const storedChallenge = localStorage.getItem('challenge');
     const storedParticipantId = localStorage.getItem('participantId');
@@ -142,7 +136,6 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, []);
 
-  // Update localStorage when challenge changes
   useEffect(() => {
     if (challenge) {
       localStorage.setItem('challenge', JSON.stringify(challenge));
@@ -153,11 +146,9 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, [challenge, participantId]);
 
-  // Set up real-time subscription to the challenge
   useEffect(() => {
     if (!challenge || !challenge.id) return;
 
-    // Set up real-time subscription using Supabase Realtime
     const subscription = supabase
       .channel(`challenge-${challenge.id}`)
       .on(
@@ -171,13 +162,11 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         async (payload) => {
           console.log('Realtime update received:', payload);
           
-          // Get the updated challenge from Supabase
           const updatedChallenge = await getChallenge(challenge.id);
           
           if (updatedChallenge && JSON.stringify(updatedChallenge) !== JSON.stringify(challenge)) {
             console.log('Setting updated challenge:', updatedChallenge);
             
-            // Preserve the current participant's information
             if (participantId && updatedChallenge.participants) {
               if (!updatedChallenge.participants[participantId] && challenge.participants[participantId]) {
                 updatedChallenge.participants[participantId] = challenge.participants[participantId];
@@ -186,7 +175,6 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             
             setChallenge(updatedChallenge);
             
-            // If challenge status changed to active, navigate to duel page
             if (updatedChallenge.status === 'active' && challenge.status === 'waiting') {
               navigate(`/duel/${challenge.id}`);
               toast.success("Challenge started!");
@@ -196,13 +184,11 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       )
       .subscribe();
 
-    // Fallback polling mechanism in case the subscription fails
     const checkForUpdates = async () => {
       try {
         const latestChallenge = await getChallenge(challenge.id);
         
         if (latestChallenge && JSON.stringify(latestChallenge) !== JSON.stringify(challenge)) {
-          // Preserve the current participant's information
           if (participantId && latestChallenge.participants) {
             if (!latestChallenge.participants[participantId] && challenge.participants[participantId]) {
               latestChallenge.participants[participantId] = challenge.participants[participantId];
@@ -211,7 +197,6 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           
           setChallenge(latestChallenge);
           
-          // If challenge status changed to active, navigate to duel page
           if (latestChallenge.status === 'active' && challenge.status === 'waiting') {
             navigate(`/duel/${challenge.id}`);
             toast.success("Challenge started!");
@@ -222,7 +207,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
     };
 
-    const intervalId = setInterval(checkForUpdates, 5000); // Check every 5 seconds as a fallback
+    const intervalId = setInterval(checkForUpdates, 5000);
     
     return () => {
       subscription.unsubscribe();
@@ -230,7 +215,6 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
   }, [challenge, participantId, navigate]);
 
-  // Check if challenge is active and user left the page
   useEffect(() => {
     if (!challenge || challenge.status !== 'active' || !participantId) return;
 
@@ -261,7 +245,6 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
   }, [challenge, participantId]);
 
-  // Check if challenge time has ended
   useEffect(() => {
     if (!challenge || challenge.status !== 'active' || !challenge.endTime) return;
 
@@ -282,10 +265,8 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const generateId = () => Math.random().toString(36).substring(2, 9);
 
   const createChallenge = async (name: string, duration: number, reward: string): Promise<string> => {
-    // Generate unique IDs
     const userId = generateId();
     
-    // Create challenge data format for database
     const dbChallenge = {
       created_by: userId,
       duration,
@@ -303,7 +284,6 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
     
     try {
-      // Insert into Supabase
       const { data, error } = await supabase
         .from('challenges')
         .insert(dbChallenge)
@@ -315,7 +295,6 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         throw error;
       }
       
-      // Create our app's challenge format
       const createdChallenge: ChallengeType = {
         id: data.id,
         createdBy: data.created_by,
@@ -341,7 +320,6 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const joinChallenge = async (challengeId: string, name: string, reward: string) => {
     try {
-      // Get challenge from Supabase
       const existingChallenge = await getChallenge(challengeId);
       
       if (!existingChallenge) {
@@ -349,7 +327,6 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return;
       }
       
-      // Add the participant
       const userId = generateId();
       const updatedChallenge: ChallengeType = {
         ...existingChallenge,
@@ -367,7 +344,6 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setParticipantId(userId);
       localStorage.setItem('participantId', userId);
       
-      // Update the challenge in Supabase
       await updateChallenge(updatedChallenge);
       navigate(`/waiting/${challengeId}`);
     } catch (error) {
@@ -406,7 +382,6 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const handleLoss = async () => {
     if (!challenge || !participantId) return;
     
-    // Update this participant's status to lost
     const updatedParticipants = {
       ...challenge.participants,
       [participantId]: {
@@ -415,13 +390,11 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
     };
     
-    // Check if there's only one active participant left
     const activeParticipants = Object.entries(updatedParticipants)
       .filter(([_, p]) => p.status === 'active');
     
     let updatedStatus = challenge.status;
     
-    // If only one active player remains, they win
     if (activeParticipants.length === 1) {
       const lastActiveId = activeParticipants[0][0];
       updatedParticipants[lastActiveId] = {
@@ -430,7 +403,6 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       };
       updatedStatus = 'completed' as ChallengeStatus;
     }
-    // If no active players remain, challenge is completed
     else if (activeParticipants.length === 0) {
       updatedStatus = 'completed' as ChallengeStatus;
     }
@@ -454,7 +426,6 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const completeChallenge = async () => {
     if (!challenge) return;
     
-    // Everyone who is still active has won
     const updatedParticipants = { ...challenge.participants };
     Object.keys(updatedParticipants).forEach(id => {
       if (updatedParticipants[id].status === 'active') {
@@ -473,6 +444,7 @@ export const ChallengeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     
     setChallenge(updatedChallenge);
     await updateChallenge(updatedChallenge);
+    
     navigate(`/results/${challenge.id}`);
     toast.success("Challenge completed successfully!");
   };
